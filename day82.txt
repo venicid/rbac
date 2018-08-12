@@ -1,0 +1,244 @@
+权限组件
+
+   1 项目与应用
+   Role-Based Access Control
+   
+   2 什么是权限？
+    
+     一个包含正则表达式url就是一个权限
+	
+   
+     who   what    how   ---------->True  or  Flase
+	 
+	
+	# 版本1
+	用户表与权限url表 对应关系
+	 UserInfor
+	 
+		 name       
+		 pwd
+		 permission=models.manytomany(Permission)
+	    
+		
+		name   pwd    
+		egon   123            
+		alex   456    
+		A      111
+		B      222
+		C      333
+		D      444
+		
+		
+	 Permission
+	 
+	    url=.....
+      	title=....
+		
+    id       url            title
+	1	 "/users/"         "查看用户"
+	2	 "/users/add/"     "添加用户"
+ 	3    "/customer/add"	"添加客户"
+		 
+	 UserInfor_permission
+
+        id
+        user_id
+        permission_id		
+		 
+		 
+		id    user_id   permission_id
+         1       1           1		
+		 2       1           2
+		 3       2           2
+		 
+		 4       3           1
+		 5       3           2
+		 6       3           3
+		 
+		 4       4           1
+		 5       4           2
+		 6       4          3
+		 
+		 
+		 4       5           1
+		 5       5           2
+		 6       5           3
+		 
+		 
+		 4       6           1
+		 5       6           2
+		 6       6           3
+		 
+		 
+		 4       7           1
+		 5       7           2
+		 6       7           3
+		 
+		 
+		 
+		 
+		 
+	示例：登录人：egon
+          访问url:http://127.0.0.1:8000/users/	
+		 
+		  
+		  def users(request):
+             
+			 user_id=request.session.get("user_id")
+			 
+			 
+			 obj=UserInfor.objects.filter(pk=user_id).first()
+			 obj.permission.all().valuelist("url")
+			 
+			 
+			 
+             return HttpResponse("users.....")
+		 
+		 
+	# 版本2：
+
+	用户--》角色--》权限
+
+    UserInfor
+	 
+		 name       
+		 pwd
+		 roles
+		
+	    
+		
+		name   pwd    
+		egon   123            
+		alex   456    
+		alex   456    
+		alex   456    
+		alex   456    
+		alex   456    
+		alex   456    
+		alex   456    
+		alex   456    
+		
+			
+	Role
+       
+       title=.......	   
+	   permissions=......
+	   
+		 id   title
+		 1   销售员
+	   
+	
+    UserInfor2Role
+
+       id     user_id    role_id	
+        1        1          1
+
+		
+	Permission
+	 
+	    url=.....
+      	title=....
+		
+    id       url            title
+	1	 "/users/"         "查看用户"
+	2	 "/users/add/"     "添加用户"
+ 	3    "/customer/add"	"添加客户"
+		 
+	
+		 
+		 
+	Role2Permission
+
+    id  role_id   permission_id	
+	 1      1	       1
+	 2      1	       2
+	 3      1	       3
+		 
+		 
+		 
+	3  rbac（role-based access control） 
+	 
+	 
+	 
+	
+关于rbac： 
+
+    (1) 创建表关系：
+        class User(models.Model):
+			name=models.CharField(max_length=32)
+			pwd=models.CharField(max_length=32)
+			roles=models.ManyToManyField(to="Role")
+
+			def __str__(self): return self.name
+
+		class Role(models.Model):
+			title=models.CharField(max_length=32)
+			permissions=models.ManyToManyField(to="Permission")
+
+			def __str__(self): return self.title
+
+		class Permission(models.Model):
+			title=models.CharField(max_length=32)
+			url=models.CharField(max_length=32)
+
+			def __str__(self):return self.title
+	
+	(2) 基于admin录入数据
+
+
+    (3) 登录校验：
+	    
+		if 登录成功:
+		   
+            查询当前登录用户的权限列表注册到session中
+
+    (4) 校验权限（中间件的应用）
+	    class ValidPermission(MiddlewareMixin):
+
+			def process_request(self,request):
+
+				# 当前访问路径
+				current_path = request.path_info
+
+				# 检查是否属于白名单
+				valid_url_list=["/login/","/reg/","/admin/.*"]
+
+				for valid_url in valid_url_list:
+					ret=re.match(valid_url,current_path)
+					if ret:
+						return None
+
+
+				# 校验是否登录
+
+				user_id=request.session.get("user_id")
+
+				if not user_id:
+					return redirect("/login/")
+
+
+				# 校验权限
+				permission_list = request.session.get("permission_list",[])  # ['/users/', '/users/add', '/users/delete/(\\d+)', 'users/edit/(\\d+)']
+
+
+				flag = False
+				for permission in permission_list:
+
+					permission = "^%s$" % permission
+
+					ret = re.match(permission, current_path)
+					if ret:
+						flag = True
+						break
+				if not flag:
+					return HttpResponse("没有访问权限！")
+
+				return None
+				
+				
+		
+	    
+			
+		   
+		
+   	
